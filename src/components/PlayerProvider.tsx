@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 
+import { useLibrary } from "@/components/LibraryProvider";
 import { PlayerBar } from "@/components/PlayerBar";
 import type { RepeatMode, Track } from "@/lib/types";
 
@@ -72,6 +73,8 @@ function shuffleIds(ids: number[], firstId: number | null): number[] {
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // 音量の確定保存はライブラリ(真のソース)側に委譲する
+  const { setTrackVolume } = useLibrary();
 
   const [queue, setQueue] = useState<Track[]>([]);
   const [currentId, setCurrentId] = useState<number | null>(null);
@@ -210,21 +213,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const setVolume = useCallback(
     (id: number, volume: number, commit: boolean) => {
       const v = clampVol(Math.round(volume));
+      // ドラッグ中はキュー(=再生中の表示)と audio へ即時反映
       setQueue((prev) =>
         prev.map((t) => (t.id === id ? { ...t, volume: v } : t)),
       );
       if (id === currentIdRef.current && audioRef.current) {
         audioRef.current.volume = v / 100;
       }
+      // 確定時はライブラリ(真のソース)＋DBへ保存 → 別の曲を挟んでも保持される
       if (commit) {
-        void fetch(`/api/tracks/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ volume: v }),
-        }).catch(() => {});
+        setTrackVolume(id, v);
       }
     },
-    [],
+    [setTrackVolume],
   );
 
   // ---- audio イベント（refs を使うので一度だけ束ねる） ----

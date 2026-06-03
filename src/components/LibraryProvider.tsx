@@ -30,6 +30,7 @@ interface LibraryContextValue {
     files: File[],
   ) => Promise<{ ok: boolean; added?: number; error?: string }>;
   removeTrack: (id: number) => Promise<void>;
+  setTrackVolume: (id: number, volume: number) => void;
   createPlaylist: (name: string) => Promise<Playlist | null>;
   deletePlaylist: (id: number) => Promise<void>;
   renamePlaylist: (id: number, name: string) => Promise<void>;
@@ -67,6 +68,36 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+
+  // 編集中/コミット待ちの音量を保持し、ポーリング等の再取得による上書きから守る
+  const pendingVolumeRef = useRef<Map<number, number>>(new Map());
+  const applyPending = useCallback((list: Track[]): Track[] => {
+    const p = pendingVolumeRef.current;
+    return p.size === 0
+      ? list
+      : list.map((t) => (p.has(t.id) ? { ...t, volume: p.get(t.id)! } : t));
+  }, []);
+
+  // 曲の音量を確定保存：ローカルの真のソース(tracks/playlistTracks)と DB を更新。
+  // これで別の曲を再生して戻ってきても音量が保持される
+  // （以前は再生キューだけ更新していたため、再生し直すと既定値に戻っていた）。
+  const setTrackVolume = useCallback((id: number, volume: number) => {
+    const v = Math.max(0, Math.min(100, Math.round(volume)));
+    pendingVolumeRef.current.set(id, v);
+    setTracks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, volume: v } : t)),
+    );
+    setPlaylistTracks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, volume: v } : t)),
+    );
+    void fetch(`/api/tracks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ volume: v }),
+    })
+      .catch(() => {})
+      .finally(() => pendingVolumeRef.current.delete(id));
+  }, []);
 
   const viewTracks = useMemo(
     () => (view.type === "library" ? tracks : playlistTracks),
@@ -112,7 +143,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     const t = await fetchTracks();
-    if (t) setTracks(t);
+    if (t) setTracks(applyPending(t));
     const v = viewRef.current;
     if (v.type === "playlist") {
       const reqId = v.id;
@@ -123,11 +154,11 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         viewRef.current.type === "playlist" &&
         viewRef.current.id === reqId
       ) {
-        setPlaylistTracks(pt);
+        setPlaylistTracks(applyPending(pt));
       }
     }
     setLoading(false);
-  }, [fetchTracks, fetchPlaylistTracks]);
+  }, [fetchTracks, fetchPlaylistTracks, applyPending]);
 
   useEffect(() => {
     void refresh();
@@ -160,12 +191,12 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
             viewRef.current.type === "playlist" &&
             viewRef.current.id === reqId
           ) {
-            setPlaylistTracks(pt);
+            setPlaylistTracks(applyPending(pt));
           }
         });
       }
     },
-    [fetchPlaylistTracks],
+    [fetchPlaylistTracks, applyPending],
   );
 
   const reloadCurrentPlaylist = useCallback(async () => {
@@ -178,10 +209,10 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         viewRef.current.type === "playlist" &&
         viewRef.current.id === reqId
       ) {
-        setPlaylistTracks(pt);
+        setPlaylistTracks(applyPending(pt));
       }
     }
-  }, [fetchPlaylistTracks]);
+  }, [fetchPlaylistTracks, applyPending]);
 
   // ---- 取り込み ----
   const addByUrl = useCallback(
@@ -344,6 +375,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     addByUrl,
     uploadFiles,
     removeTrack,
+    setTrackVolume,
     createPlaylist,
     deletePlaylist,
     renamePlaylist,
