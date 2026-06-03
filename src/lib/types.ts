@@ -1,5 +1,5 @@
 // アプリ全体で共有する型。
-// DB 列(snake_case) ↔ アプリ(camelCase) の変換は src/lib/tracks.ts で行う。
+// DB 列(snake_case) ↔ アプリ(camelCase) の変換は src/lib/tracks.ts / playlists.ts で行う。
 
 export type TrackStatus = "queued" | "downloading" | "ready" | "error";
 
@@ -16,6 +16,18 @@ export interface Track {
   thumbnailUrl: string | null;
   status: TrackStatus;
   error: string | null;
+  /** yt-dlp の出力ログ（取り込み時に蓄積） */
+  log: string | null;
   /** ISO 8601 文字列 */
   createdAt: string;
 }
+
+export interface Playlist {
+  id: number;
+  name: string;
+  trackCount: number;
+  createdAt: string;
+}
+
+/** プレイヤーのリピートモード */
+export type RepeatMode = "off" | "all" | "one";

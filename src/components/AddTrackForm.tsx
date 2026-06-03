@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { usePlayer } from "@/components/PlayerProvider";
+import { useLibrary } from "@/components/LibraryProvider";
 
 export function AddTrackForm() {
-  const { addByUrl } = usePlayer();
+  const { addByUrl, uploadFiles } = useLibrary();
   const [url, setUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(
     null,
   );
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,15 +24,30 @@ export function AddTrackForm() {
     setSubmitting(false);
     if (result.ok) {
       setUrl("");
-      setMsg({ type: "ok", text: "ダウンロードを開始しました" });
+      setMsg({ type: "ok", text: "取り込みを開始しました" });
+    } else {
+      setMsg({ type: "error", text: result.error ?? "失敗しました" });
+    }
+  }
+
+  async function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setUploading(true);
+    setMsg(null);
+    const result = await uploadFiles(files);
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+    if (result.ok) {
+      setMsg({ type: "ok", text: `${result.added ?? 0} 件アップロードしました` });
     } else {
       setMsg({ type: "error", text: result.error ?? "失敗しました" });
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="mb-6">
-      <div className="flex gap-2">
+    <div className="mb-5">
+      <form onSubmit={onSubmit} className="flex gap-2">
         <input
           type="url"
           inputMode="url"
@@ -46,7 +63,27 @@ export function AddTrackForm() {
         >
           {submitting ? "追加中…" : "追加"}
         </button>
+      </form>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {uploading ? "アップロード中…" : "＋ MP3 をアップロード"}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="audio/mpeg,.mp3"
+          multiple
+          className="hidden"
+          onChange={onFiles}
+        />
       </div>
+
       {msg && (
         <p
           className={`mt-2 text-xs ${
@@ -56,6 +93,6 @@ export function AddTrackForm() {
           {msg.text}
         </p>
       )}
-    </form>
+    </div>
   );
 }

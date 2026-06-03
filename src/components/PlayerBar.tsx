@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { usePlayer } from "@/components/PlayerProvider";
+import { usePlayer, usePlayerProgress } from "@/components/PlayerProvider";
 import { formatTime } from "@/lib/format";
 
 function PlayIcon() {
@@ -35,14 +35,30 @@ function NextIcon() {
 }
 function VolumeIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4 shrink-0 text-zinc-400"
-      fill="currentColor"
-      aria-hidden
-    >
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-zinc-400" fill="currentColor" aria-hidden>
       <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12z" />
     </svg>
+  );
+}
+function ShuffleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+      <path d="M17 3l4 4-4 4v-3h-2.5l-2.3 2.6-1.3-1.5L13.4 6H17V3zM3 6h3.6l8.8 9.9.6.1H17v-3l4 4-4 4v-3h-2.6l-.7-.2L4.9 9H3V6zm0 9h3l1.6-1.8 1.3 1.5L6.6 18H3v-3z" />
+    </svg>
+  );
+}
+function RepeatIcon({ one }: { one?: boolean }) {
+  return (
+    <span className="relative inline-flex">
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
+        <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+      </svg>
+      {one && (
+        <span className="absolute -right-1 -top-1 rounded bg-green-500 px-1 text-[9px] font-bold leading-tight text-black">
+          1
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -50,16 +66,18 @@ export function PlayerBar() {
   const {
     current,
     isPlaying,
-    currentTime,
-    duration,
+    shuffle,
+    repeat,
     togglePlay,
     next,
     prev,
     seek,
     setVolume,
+    toggleShuffle,
+    cycleRepeat,
   } = usePlayer();
+  const { currentTime, duration } = usePlayerProgress();
 
-  // ドラッグ中はローカル値を表示し、再生中の timeupdate に引き戻されないようにする
   const [scrubbing, setScrubbing] = useState(false);
   const [scrubValue, setScrubValue] = useState(0);
 
@@ -67,19 +85,14 @@ export function PlayerBar() {
 
   const seekValue = scrubbing ? scrubValue : Math.min(currentTime, duration || 0);
 
-  const onVolChange = (e: React.SyntheticEvent<HTMLInputElement>) =>
-    setVolume(current.id, Number(e.currentTarget.value), false);
-  const onVolCommit = (e: React.SyntheticEvent<HTMLInputElement>) =>
-    setVolume(current.id, Number(e.currentTarget.value), true);
-
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="mx-auto w-full max-w-2xl px-3 pt-2">
         {/* シークバー */}
-        <div className="flex items-center gap-2 px-3 pt-2 text-[11px] tabular-nums text-zinc-400">
+        <div className="flex items-center gap-2 text-[11px] tabular-nums text-zinc-400">
           <span className="w-9 text-right">{formatTime(currentTime)}</span>
           <input
             type="range"
@@ -105,19 +118,18 @@ export function PlayerBar() {
           <span className="w-9">{formatTime(duration)}</span>
         </div>
 
-        {/* メイン操作行 */}
-        <div className="flex items-center gap-3 px-3 py-2">
+        {/* 情報 + 音量 */}
+        <div className="mt-1 flex items-center gap-3">
           {current.thumbnailUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={current.thumbnailUrl}
               alt=""
-              className="h-11 w-11 shrink-0 rounded object-cover"
+              className="h-10 w-10 shrink-0 rounded object-cover"
             />
           ) : (
-            <div className="h-11 w-11 shrink-0 rounded bg-zinc-700" />
+            <div className="h-10 w-10 shrink-0 rounded bg-zinc-700" />
           )}
-
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{current.title}</div>
             {current.artist && (
@@ -126,33 +138,6 @@ export function PlayerBar() {
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={prev}
-            className="hidden text-zinc-300 hover:text-white sm:block"
-            aria-label="前の曲"
-          >
-            <PrevIcon />
-          </button>
-          <button
-            type="button"
-            onClick={togglePlay}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-zinc-900 hover:bg-zinc-200"
-            aria-label={isPlaying ? "一時停止" : "再生"}
-          >
-            {isPlaying ? <PauseIcon /> : <PlayIcon />}
-          </button>
-          <button
-            type="button"
-            onClick={next}
-            className="hidden text-zinc-300 hover:text-white sm:block"
-            aria-label="次の曲"
-          >
-            <NextIcon />
-          </button>
-
-          {/* 音量（曲ごと） */}
           <div className="flex items-center gap-1">
             <VolumeIcon />
             <input
@@ -161,10 +146,18 @@ export function PlayerBar() {
               max={100}
               step={1}
               value={current.volume}
-              onChange={onVolChange}
-              onPointerUp={onVolCommit}
-              onKeyUp={onVolCommit}
-              onTouchEnd={onVolCommit}
+              onChange={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), false)
+              }
+              onPointerUp={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), true)
+              }
+              onKeyUp={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), true)
+              }
+              onTouchEnd={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), true)
+              }
               className="h-1 w-16 cursor-pointer sm:w-24"
               aria-label="この曲の音量"
             />
@@ -172,6 +165,51 @@ export function PlayerBar() {
               {current.volume}
             </span>
           </div>
+        </div>
+
+        {/* 再生コントロール */}
+        <div className="mt-1 flex items-center justify-center gap-5 py-1">
+          <button
+            type="button"
+            onClick={toggleShuffle}
+            className={shuffle ? "text-green-400" : "text-zinc-500 hover:text-zinc-300"}
+            aria-label="シャッフル"
+            aria-pressed={shuffle}
+          >
+            <ShuffleIcon />
+          </button>
+          <button
+            type="button"
+            onClick={prev}
+            className="text-zinc-200 hover:text-white"
+            aria-label="前の曲"
+          >
+            <PrevIcon />
+          </button>
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-zinc-900 hover:bg-zinc-200"
+            aria-label={isPlaying ? "一時停止" : "再生"}
+          >
+            {isPlaying ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          <button
+            type="button"
+            onClick={next}
+            className="text-zinc-200 hover:text-white"
+            aria-label="次の曲"
+          >
+            <NextIcon />
+          </button>
+          <button
+            type="button"
+            onClick={cycleRepeat}
+            className={repeat === "off" ? "text-zinc-500 hover:text-zinc-300" : "text-green-400"}
+            aria-label={`リピート: ${repeat === "off" ? "なし" : repeat === "all" ? "全体" : "1曲"}`}
+          >
+            <RepeatIcon one={repeat === "one"} />
+          </button>
         </div>
       </div>
     </div>

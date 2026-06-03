@@ -5,6 +5,7 @@ import { ensureSchema, query } from "@/lib/db";
 import type { Track, TrackStatus } from "@/lib/types";
 
 // SELECT * / RETURNING * を避け、列を明示する（スキーマ変更時のドリフトを検知しやすく）。
+// 一覧用カラム（log は大きくなるので含めない。log は getTrackById / ログ専用で取得）。
 const COLUMNS =
   "id, title, artist, source_url, source_id, file_path, duration_sec, volume, thumbnail_url, status, error, created_at";
 
@@ -20,6 +21,7 @@ interface TrackRow {
   thumbnail_url: string | null;
   status: TrackStatus;
   error: string | null;
+  log: string | null;
   created_at: Date;
 }
 
@@ -36,6 +38,7 @@ function mapRow(r: TrackRow): Track {
     thumbnailUrl: r.thumbnail_url,
     status: r.status,
     error: r.error,
+    log: r.log ?? null,
     createdAt:
       r.created_at instanceof Date
         ? r.created_at.toISOString()
@@ -55,7 +58,7 @@ export async function getTrackById(id: number): Promise<Track | null> {
   if (!Number.isInteger(id) || id <= 0) return null;
   await ensureSchema();
   const { rows } = await query<TrackRow>(
-    `SELECT ${COLUMNS} FROM tracks WHERE id = $1`,
+    `SELECT ${COLUMNS}, log FROM tracks WHERE id = $1`,
     [id],
   );
   return rows[0] ? mapRow(rows[0]) : null;
@@ -71,6 +74,22 @@ export async function createQueuedTrack(url: string): Promise<Track> {
     ["（取得中…）", url],
   );
   return mapRow(rows[0]);
+}
+
+/** アップロード等で、タイトルを指定して ready 直前の行を作る（source_url は無し）。 */
+export async function createUploadTrack(title: string): Promise<Track> {
+  await ensureSchema();
+  const { rows } = await query<TrackRow>(
+    `INSERT INTO tracks (title, status) VALUES ($1, 'queued') RETURNING ${COLUMNS}`,
+    [title || "（無題）"],
+  );
+  return mapRow(rows[0]);
+}
+
+/** yt-dlp の出力ログを保存する（取り込み中に逐次更新）。 */
+export async function setTrackLog(id: number, log: string): Promise<void> {
+  await ensureSchema();
+  await query("UPDATE tracks SET log = $2 WHERE id = $1", [id, log]);
 }
 
 export async function updateTrackVolume(
@@ -158,3 +177,7 @@ export async function reclaimInterruptedDownloads(): Promise<number[]> {
   );
   return rows.map((r) => Number(r.id));
 }
+
+// playlists.ts から行マッピングを再利用するためのエクスポート
+export { mapRow as mapTrackRow };
+export type { TrackRow };

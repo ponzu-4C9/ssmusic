@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { LibraryProvider } from "@/components/LibraryProvider";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { isAuthenticated } from "@/lib/session";
 
@@ -12,5 +13,9 @@ export default async function AppLayout({
   if (!(await isAuthenticated())) {
     redirect("/login");
   }
-  return <PlayerProvider>{children}</PlayerProvider>;
+  return (
+    <LibraryProvider>
+      <PlayerProvider>{children}</PlayerProvider>
+    </LibraryProvider>
+  );
 }
