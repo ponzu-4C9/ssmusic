@@ -1,0 +1,33 @@
+# 本番(自宅サーバー)用の追加レイヤー：Caddy を前段に立てて HTTPS を終端する。
+#
+# 使い方（サーバー上）:
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+#
+# 事前準備:
+#   1. DNS(バリュードメイン): `a music <サーバーの固定グローバルIP>` を追加
+#      → music.shirai-dev.com がサーバーを指す
+#   2. ルーター: TCP 80 と 443（HTTP/3 を使うなら UDP 443 も）をサーバーへ転送
+#   3. .env: DOMAIN=music.shirai-dev.com / TRUST_PROXY=1 / 強固な APP_PASSWORD・SESSION_SECRET
+#
+# ※ ローカル開発(WSL)では使わない。開発は docker-compose.dev.yml を使う。
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:-music.shirai-dev.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # 取得した証明書を永続化（再発行・レート制限回避）
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

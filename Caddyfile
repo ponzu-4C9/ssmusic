@@ -1,0 +1,23 @@
+# Caddy リバースプロキシ設定。
+# {$DOMAIN} は docker-compose.caddy.yml から渡される（既定: music.shirai-dev.com）。
+# Caddy が Let's Encrypt で TLS 証明書を自動取得・自動更新する。
+#   前提: DNS A レコード(music → 固定IP)があり、
+#         ルーターで 80/443 がインターネットから到達できること。
+#
+# 将来ほかのアプリを足すときは、ここに site ブロックを追加する。例:
+#   blog.shirai-dev.com { reverse_proxy blog-app:3000 }
+
+{$DOMAIN:music.shirai-dev.com} {
+	encode zstd gzip
+
+	# MP3 アップロードの上限（アプリ側は 200MB なので少し余裕を持たせる）
+	request_body {
+		max_size 250MB
+	}
+
+	# 内部ネットワーク経由でアプリへ転送（app は外部公開しない）
+	reverse_proxy app:3000
+
+	# 動作確認できたら有効化すると HTTPS を強制できる（任意）:
+	# header Strict-Transport-Security "max-age=31536000"
+}

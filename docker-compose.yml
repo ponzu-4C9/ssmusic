@@ -49,7 +49,9 @@ services:
       # MP3 本体を永続化（コンテナを作り直しても残る）
       - media:/app/media
     ports:
-      - "3000:3000"
+      # ホストの localhost からのみ到達可能（LAN・外部には出さない）。
+      # 外部公開は Caddy(docker-compose.caddy.yml) 経由の HTTPS のみ。
+      - "127.0.0.1:3000:3000"
 
 volumes:
   pgdata:

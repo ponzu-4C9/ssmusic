@@ -54,14 +54,48 @@ docker compose logs -f app
 - **DB スキーマ**は起動時 (`src/instrumentation.ts`) に自動作成され、手動マイグレーション不要。
 - **yt-dlp の更新**: YouTube は仕様変更が頻繁で、古い yt-dlp は「Unable to extract」等で失敗する。本イメージは pip で最新を取得するが、ダウンロードが壊れたら **イメージを再ビルド**すれば最新化される。強制更新は `docker compose build --build-arg YTDLP_REFRESH=$(date +%s) app`。
 
-## ⚠️ インターネット公開とセキュリティ
+## HTTPS で公開（本番・自宅サーバー）
 
-ポート開放で外部公開する前に必ず読むこと:
+`music.shirai-dev.com` を Caddy + Let's Encrypt で HTTPS 公開する手順。アプリ本体は
+`127.0.0.1:3000` のみ（LAN/外部に出さない）で、外部公開は Caddy 経由の 443 のみ。
 
-1. **TLS(HTTPS) を用意する**。未TLSの平文HTTPだとログインパスワードとセッション Cookie が盗聴され得る。ドメイン取得後に **Caddy 等のリバースプロキシ**で TLS を終端し、`docker-compose.yml` の `ports` を `127.0.0.1:3000:3000` 等に絞るのが安全。
-2. プロキシ導入後は `.env` で **`TRUST_PROXY=1`** にする。これでログイン試行のレート制限が実クライアント IP 単位で効く。プロキシが無い直接公開時は `0` のまま（`X-Forwarded-For` 偽装でのレート制限回避を防ぐため、全リクエストを共通制限にまとめる）。
-3. `APP_PASSWORD` は推測されにくい十分長い値にする（唯一の認証情報のため）。
-4. YouTube からのダウンロードは個人利用の範囲で。著作権・利用規約に留意。
+**1. DNS（バリュードメイン）** — DNS レコード欄に1行追加（`<固定IP>` は自宅の固定グローバルIP）:
+
+```
+a music <固定IP>
+```
+
+→ `music.shirai-dev.com` がサーバーを指す。反映に5〜30分。
+※ CAA レコードは設定しない（設定するなら `letsencrypt.org` を許可。除外すると証明書取得に失敗）。
+
+**2. ルーター** — TCP **80** と **443**（HTTP/3 を使うなら UDP 443 も）をサーバーへポート転送。
+
+**3. サーバーで起動**:
+
+```bash
+cp .env.example .env
+#  .env を編集:
+#   DOMAIN=music.shirai-dev.com
+#   TRUST_PROXY=1
+#   APP_PASSWORD / SESSION_SECRET を強固な値に
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+docker compose logs -f caddy   # 証明書取得ログを確認
+```
+
+数十秒で証明書を取得し、`https://music.shirai-dev.com` で公開される（http は自動で https にリダイレクト）。
+
+### セキュリティ要点
+
+1. **`TRUST_PROXY=1`**（Caddy の背後）でレート制限が実クライアント IP 単位で効く。直接公開（Caddyなし）時は `0` のまま。
+2. `APP_PASSWORD` は推測されにくい十分長い値に（唯一の認証情報）。
+3. YouTube からのダウンロードは個人利用の範囲で。著作権・利用規約に留意。
+
+### 同じサーバーで複数アプリを動かす場合（将来）
+
+今の `docker-compose.caddy.yml` は Caddy がこのアプリ専用。2つ目以降のアプリを足すときは、
+Caddy を共有リバースプロキシ（外部 Docker ネットワーク `web` 上の独立スタック）に切り出し、
+各アプリをその `web` に繋いで `Caddyfile` にサブドメインの site ブロックを追加する構成にする
+（80/443 は1つの Caddy が一括で受ける）。必要になったら相談してください。
 
 ## ディレクトリ構成（抜粋）
 
