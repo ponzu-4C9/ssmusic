@@ -1,0 +1,33 @@
+# 家庭内 split DNS（任意）。LAN内の端末が music.shirai-dev.com を
+# 「サーバーのLAN IP」に解決できるようにする。
+#   → ヘアピンNAT不要で、スマホ/PC からドメインでアクセス可能（証明書も有効なまま）。
+#
+# 仕組み: music.shirai-dev.com だけ LAN_IP に上書きし、それ以外は通常通り 1.1.1.1/8.8.8.8 へ転送。
+#
+# 事前に .env へ設定:
+#   DOMAIN=music.shirai-dev.com
+#   LAN_IP=<サーバーのLAN IP>     # 確認: ip route get 1.1.1.1 | grep -oP 'src \K\S+'
+#                                  # （172.x の Docker 内部IPではなく 192.168.x.x 等）
+#
+# 起動: docker compose -f docker-compose.dns.yml up -d
+# その後、各端末（スマホ/PC）の DNS を LAN_IP に設定する（後述: README）。
+#
+# ※ LAN_IP に bind するのは Ubuntu の systemd-resolved(127.0.0.53:53) との競合回避のため。
+# ※ サーバーの LAN IP は固定（DHCP予約 or 静的）にしておくこと。変わると壊れる。
+
+services:
+  dns:
+    image: 4km3/dnsmasq:2.90-r3
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "${LAN_IP}:53:53/udp"
+      - "${LAN_IP}:53:53/tcp"
+    command:
+      - --keep-in-foreground
+      - --no-resolv
+      - --no-hosts
+      - --address=/${DOMAIN}/${LAN_IP}
+      - --server=1.1.1.1
+      - --server=8.8.8.8

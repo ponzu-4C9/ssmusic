@@ -101,6 +101,31 @@ Caddy を共有リバースプロキシ（外部 Docker ネットワーク `web`
 各アプリをその `web` に繋いで `Caddyfile` にサブドメインの site ブロックを追加する構成にする
 （80/443 は1つの Caddy が一括で受ける）。必要になったら相談してください。
 
+## 家のLANからドメインでアクセス（split DNS・任意）
+
+外部（モバイル通信等）からは `https://music.shirai-dev.com` で見られるが、**自宅LAN内の端末**から
+同じドメインで開くと、多くのルーター（SoftBank 光BB 等）が**ヘアピンNAT非対応**のため失敗する。
+解決策は2つ:
+
+**A. ルーターで「NATループバック / ヘアピンNAT」を有効化**（対応していれば設定ゼロで全端末OK）
+
+**B. 家庭内 split DNS を立てる**（`docker-compose.dns.yml`）。LAN内だけ
+`music.shirai-dev.com` → サーバーのLAN IP に解決させる（証明書は SNI で一致するので有効なまま）。
+
+```bash
+# サーバーで（.env に DOMAIN と LAN_IP を設定後）
+ip route get 1.1.1.1 | grep -oP 'src \K\S+'     # ← これが LAN_IP（172.x の Docker IP は不可）
+docker compose -f docker-compose.dns.yml up -d
+```
+
+次に各端末の DNS をサーバーの LAN IP に向ける（ルーターのDHCPでDNSを配れるならそこで一括、無理なら端末ごと）:
+- **iPhone**: 設定 → Wi-Fi → ネットワークの (i) → DNSを構成 → 手動 → 既存を消して LAN_IP を追加
+- **Android**: Wi-Fi → ネットワーク設定 → IP設定を「静的」→ DNS1 に LAN_IP（プライベートDNSはホスト名専用で不可）
+- **Windows**: アダプター設定 → IPv4 → 優先DNSサーバー = LAN_IP
+
+> 注意: サーバーの LAN IP は**固定**（DHCP予約か静的）にすること。予備DNSに `1.1.1.1` を併記しておくと、
+> DNSコンテナ停止時も一般の名前解決は生きる（その間ドメイン→LAN IP の上書きは効かない）。
+
 ## ディレクトリ構成（抜粋）
 
 ```
