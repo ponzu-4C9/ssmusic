@@ -1,0 +1,56 @@
+# ============================================================
+# 本番用 compose（自宅 Ubuntu サーバーで実行する想定）
+#
+#   起動:  docker compose up -d --build
+#   停止:  docker compose down
+#   ログ:  docker compose logs -f app
+#
+# 事前に .env を用意すること（.env.example をコピーして編集）。
+# ============================================================
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # 本番では DB ポートを外部公開しない（app コンテナから db:5432 で接続）。
+    # 必要なときだけ下のコメントを外す。
+    # ports:
+    #   - "5432:5432"
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      # サービス名 "db" がコンテナ間のホスト名になる
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      APP_PASSWORD: ${APP_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET}
+      # リバースプロキシ導入後に .env で TRUST_PROXY=1 にする
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      MEDIA_DIR: /app/media
+    volumes:
+      # MP3 本体を永続化（コンテナを作り直しても残る）
+      - media:/app/media
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  media:

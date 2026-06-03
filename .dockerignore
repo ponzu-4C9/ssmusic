@@ -1,0 +1,33 @@
+# 依存・ビルド成果物（イメージ内で生成・インストールする）
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+
+# ダウンロード済みの音声（ボリュームで管理。イメージに含めない）
+media
+
+# git / CI
+.git
+.gitignore
+.github
+
+# Docker 関連（イメージに含める必要なし）
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# 環境変数（ビルド時に焼き込まない。実行時に渡す）
+.env*
+
+# エディタ / OS
+.vscode
+.idea
+.DS_Store
+
+# ドキュメント・ログ
+README.md
+*.log
+npm-debug.log*
+coverage
