@@ -79,8 +79,12 @@ cp .env.example .env
 #   TRUST_PROXY=1
 #   APP_PASSWORD / SESSION_SECRET を強固な値に
 docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
-docker compose logs -f caddy   # 証明書取得ログを確認
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml logs -f caddy  # 証明書取得ログ
 ```
+
+> 💡 `caddy` を含むサブコマンド（`up`/`logs`/`ps` 等）には**毎回 2つの `-f`** が必要。
+> 面倒なら `.env` に `COMPOSE_FILE=docker-compose.yml:docker-compose.caddy.yml` を足すと、
+> 以後は素の `docker compose up -d` / `docker compose logs -f caddy` で Caddy 込みになる。
 
 数十秒で証明書を取得し、`https://music.shirai-dev.com` で公開される（http は自動で https にリダイレクト）。
 
