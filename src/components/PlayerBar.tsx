@@ -90,7 +90,39 @@ export function PlayerBar() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="mx-auto w-full max-w-2xl px-3 pt-2">
+      <div className="relative mx-auto w-full max-w-2xl px-3 pt-2">
+        {/* 縦音量スライダー（バー右端から立ち上がる = テトリスのL字） */}
+        <div className="absolute bottom-full right-2 flex flex-col items-center gap-1 rounded-t-xl border border-b-0 border-zinc-800 bg-zinc-900/95 px-2 pb-1 pt-2 backdrop-blur">
+          <VolumeIcon />
+          <div className="relative flex h-24 w-8 items-center justify-center">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={current.volume}
+              onChange={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), false)
+              }
+              onPointerUp={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), true)
+              }
+              onKeyUp={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), true)
+              }
+              onTouchEnd={(e) =>
+                setVolume(current.id, Number(e.currentTarget.value), true)
+              }
+              className="h-6 w-24 cursor-pointer"
+              style={{ transform: "rotate(-90deg)" }}
+              aria-label="この曲の音量"
+            />
+          </div>
+          <span className="text-[11px] tabular-nums text-zinc-400">
+            {current.volume}
+          </span>
+        </div>
+
         {/* シークバー */}
         <div className="flex items-center gap-2 text-[11px] tabular-nums text-zinc-400">
           <span className="w-9 text-right">{formatTime(currentTime)}</span>
@@ -118,7 +150,7 @@ export function PlayerBar() {
           <span className="w-9">{formatTime(duration)}</span>
         </div>
 
-        {/* 情報 + 音量 */}
+        {/* 情報 */}
         <div className="mt-1 flex items-center gap-3">
           {current.thumbnailUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -137,33 +169,6 @@ export function PlayerBar() {
                 {current.artist}
               </div>
             )}
-          </div>
-          <div className="flex items-center gap-1">
-            <VolumeIcon />
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={current.volume}
-              onChange={(e) =>
-                setVolume(current.id, Number(e.currentTarget.value), false)
-              }
-              onPointerUp={(e) =>
-                setVolume(current.id, Number(e.currentTarget.value), true)
-              }
-              onKeyUp={(e) =>
-                setVolume(current.id, Number(e.currentTarget.value), true)
-              }
-              onTouchEnd={(e) =>
-                setVolume(current.id, Number(e.currentTarget.value), true)
-              }
-              className="h-1 w-16 cursor-pointer sm:w-24"
-              aria-label="この曲の音量"
-            />
-            <span className="w-7 text-right text-[11px] tabular-nums text-zinc-400">
-              {current.volume}
-            </span>
           </div>
         </div>
 
