@@ -28,14 +28,6 @@ function CloseIcon() {
     </svg>
   );
 }
-function TerminalIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M7 9l3 2.5L7 14M12 15h5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 function StatusLabel({ track }: { track: Track }) {
   if (track.status === "downloading") {
@@ -67,15 +59,12 @@ function TrackRow({ track }: { track: Track }) {
     removeTrack,
     removeFromPlaylist,
     addToPlaylist,
-    openConsole,
   } = useLibrary();
   const { current, isPlaying, playQueue, togglePlay } = usePlayer();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isCurrent = current?.id === track.id;
   const ready = track.status === "ready";
-  // yt-dlp 由来、または未完了/失敗の場合にログを見せる
-  const showLog = Boolean(track.sourceUrl) || track.status !== "ready";
 
   function onPlay() {
     if (!ready) return;
@@ -131,17 +120,6 @@ function TrackRow({ track }: { track: Track }) {
           </span>
         )}
       </button>
-
-      {showLog && (
-        <button
-          type="button"
-          onClick={() => openConsole(track.id)}
-          className="shrink-0 rounded p-2 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-          aria-label="取り込みログ"
-        >
-          <TerminalIcon />
-        </button>
-      )}
 
       {view.type === "library" ? (
         <>

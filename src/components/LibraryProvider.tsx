@@ -36,7 +36,6 @@ interface LibraryContextValue {
   renamePlaylist: (id: number, name: string) => Promise<void>;
   addToPlaylist: (playlistId: number, trackId: number) => Promise<void>;
   removeFromPlaylist: (playlistId: number, trackId: number) => Promise<void>;
-  openConsole: (trackId: number) => void;
   closeConsole: () => void;
 }
 
@@ -226,6 +225,9 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         if (onUnauthorized(res)) return { ok: false, error: "未ログイン" };
         const data = await res.json().catch(() => ({}));
         if (!res.ok) return { ok: false, error: data.error ?? "失敗しました" };
+        // 取り込みログ窓を右側に自動表示（完了で自動的に閉じる）
+        const newId = (data as { track?: { id?: number } })?.track?.id;
+        if (typeof newId === "number") setConsoleTrackId(newId);
         await refresh();
         return { ok: true };
       } catch {
@@ -358,9 +360,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     [refreshPlaylists, reloadCurrentPlaylist],
   );
 
-  const openConsole = useCallback((trackId: number) => {
-    setConsoleTrackId(trackId);
-  }, []);
   const closeConsole = useCallback(() => setConsoleTrackId(null), []);
 
   const value: LibraryContextValue = {
@@ -381,7 +380,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     renamePlaylist,
     addToPlaylist,
     removeFromPlaylist,
-    openConsole,
     closeConsole,
   };
 
