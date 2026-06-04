@@ -31,3 +31,32 @@ export interface Playlist {
 
 /** プレイヤーのリピートモード */
 export type RepeatMode = "off" | "all" | "one";
+
+/** ワンタイムパスワードの状態 */
+export type LoginCodeStatus = "active" | "used" | "expired";
+
+/** 発行済みワンタイムパスワードのメタ情報（平文コードは含めない） */
+export interface LoginCodeInfo {
+  id: number;
+  /** 発行時のメモ（誰に渡したか等） */
+  label: string | null;
+  /** ISO 8601 文字列 */
+  createdAt: string;
+  /** ISO 8601 文字列 */
+  expiresAt: string;
+  /** 使用日時（未使用なら null）。ISO 8601 文字列 */
+  usedAt: string | null;
+  status: LoginCodeStatus;
+}
+
+/** ログイン履歴の 1 件 */
+export interface LoginEvent {
+  id: number;
+  /** ISO 8601 文字列 */
+  createdAt: string;
+  success: boolean;
+  /** 'password' | 'code'（失敗時は null） */
+  method: string | null;
+  ip: string | null;
+  userAgent: string | null;
+}

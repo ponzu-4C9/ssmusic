@@ -43,3 +43,28 @@ CREATE TABLE IF NOT EXISTS playlist_tracks (
 
 CREATE INDEX IF NOT EXISTS playlist_tracks_order_idx
   ON playlist_tracks (playlist_id, position, added_at);
+
+-- ワンタイムパスワード（共有パスワードを教えずに一時アクセスを渡すため）。
+-- 平文は保存せず sha256 ハッシュのみ。1回使用 or 期限切れで無効。
+CREATE TABLE IF NOT EXISTS login_codes (
+  id         BIGSERIAL   PRIMARY KEY,
+  code_hash  TEXT        NOT NULL UNIQUE,
+  label      TEXT,                         -- 発行時のメモ（誰に渡したか等）
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at    TIMESTAMPTZ                   -- 使用日時（NULL = 未使用）
+);
+
+CREATE INDEX IF NOT EXISTS login_codes_created_at_idx ON login_codes (created_at DESC);
+
+-- ログイン履歴（成功・失敗の両方を記録）。
+CREATE TABLE IF NOT EXISTS login_events (
+  id         BIGSERIAL   PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  success    BOOLEAN     NOT NULL,
+  method     TEXT,                         -- 'password' | 'code' | NULL（失敗）
+  ip         TEXT,
+  user_agent TEXT
+);
+
+CREATE INDEX IF NOT EXISTS login_events_created_at_idx ON login_events (created_at DESC);

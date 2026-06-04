@@ -1,9 +1,12 @@
-// 共有パスワードによるログイン。
-// レート制限 → 定数時間比較 → セッション Cookie 発行。
+// ログイン。共有パスワード または ワンタイムパスワード(OTP) を受け付ける。
+// レート制限 → 共有パスワード(定数時間比較) → OTP消費 → セッション Cookie 発行。
+// 成功・失敗ともログイン履歴(login_events)に記録する（記録はベストエフォート）。
 
 import { timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 
+import { consumeCode } from "@/lib/loginCodes";
+import { recordLoginEvent } from "@/lib/loginEvents";
 import { checkRateLimit, resetRateLimit } from "@/lib/ratelimit";
 import { createSession } from "@/lib/session";
 
@@ -20,6 +23,13 @@ function clientKey(req: NextRequest): string {
     return req.headers.get("x-real-ip") || "proxy-unknown";
   }
   return "direct";
+}
+
+/** 履歴表示用のクライアント IP（取れないときは null）。 */
+function clientIp(req: NextRequest): string | null {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]!.trim() || null;
+  return req.headers.get("x-real-ip");
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -59,11 +69,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!safeEqual(password, expected)) {
-    return Response.json({ error: "パスワードが違います" }, { status: 401 });
+  const ip = clientIp(req);
+  const userAgent = req.headers.get("user-agent");
+
+  // 1) 共有パスワード（定数時間比較）
+  if (safeEqual(password, expected)) {
+    resetRateLimit(key);
+    await createSession();
+    await recordLoginEvent({ success: true, method: "password", ip, userAgent });
+    return Response.json({ ok: true });
   }
 
-  resetRateLimit(key);
-  await createSession();
-  return Response.json({ ok: true });
+  // 2) ワンタイムパスワード（未使用・未期限のものを 1 回だけ消費）。
+  //    DB 障害時は false 扱いにしてログイン全体を壊さない。
+  let codeOk = false;
+  try {
+    codeOk = await consumeCode(password);
+  } catch {
+    codeOk = false;
+  }
+  if (codeOk) {
+    resetRateLimit(key);
+    await createSession();
+    await recordLoginEvent({ success: true, method: "code", ip, userAgent });
+    return Response.json({ ok: true });
+  }
+
+  await recordLoginEvent({ success: false, method: null, ip, userAgent });
+  return Response.json({ error: "パスワードが違います" }, { status: 401 });
 }

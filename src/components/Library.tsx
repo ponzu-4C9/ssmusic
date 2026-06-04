@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+
+import { AccountPanel } from "@/components/AccountPanel";
 import { AddTrackForm } from "@/components/AddTrackForm";
 import { ConsoleDrawer } from "@/components/ConsoleDrawer";
 import { useLibrary } from "@/components/LibraryProvider";
@@ -10,6 +13,7 @@ import { TrackList } from "@/components/TrackList";
 export function Library() {
   const { view, viewTracks, renamePlaylist, deletePlaylist } = useLibrary();
   const { playQueue } = usePlayer();
+  const [accountOpen, setAccountOpen] = useState(false);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -22,9 +26,24 @@ export function Library() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 pb-56 pt-6">
+    <main className="mx-auto w-full max-w-2xl px-4 pb-72 pt-6">
       <header className="mb-5 flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">SS Music</h1>
+        <button
+          type="button"
+          onClick={() => setAccountOpen(true)}
+          className="group flex items-center gap-1.5 rounded-md text-xl font-bold tracking-tight outline-none hover:text-green-400 focus-visible:ring-2 focus-visible:ring-green-500"
+          aria-label="アカウント（ワンタイムパスワード・ログイン履歴）"
+        >
+          SS Music
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4 text-zinc-600 transition-colors group-hover:text-green-400"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M12 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-3.3 0-6 1.8-6 4v1h12v-1c0-2.2-2.7-4-6-4z" />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={logout}
@@ -74,6 +93,7 @@ export function Library() {
 
       <TrackList />
       <ConsoleDrawer />
+      {accountOpen && <AccountPanel onClose={() => setAccountOpen(false)} />}
     </main>
   );
 }
