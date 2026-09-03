@@ -44,6 +44,10 @@ interface YtDumpJson {
 
 type LogFn = (chunk: string) => void;
 
+// YouTube の JavaScript challenge を解決するため、コンテナに同梱された
+// Node.js を明示的に有効化する（yt-dlp は Node を自動では有効化しない）。
+const YT_DLP_COMMON_ARGS = ["--js-runtimes", "node"] as const;
+
 /** yt-dlp を spawn し、stderr（と任意で stdout）を onLog に流す。stdout を返す。 */
 function runYtDlp(
   args: string[],
@@ -52,7 +56,9 @@ function runYtDlp(
   return new Promise((resolve, reject) => {
     // detached: 独立プロセスグループにして、timeout 時に yt-dlp が起動した
     // ffmpeg などの子プロセスもまとめて kill できるようにする。
-    const child = spawn("yt-dlp", args, { detached: true });
+    const child = spawn("yt-dlp", [...YT_DLP_COMMON_ARGS, ...args], {
+      detached: true,
+    });
     let stdout = "";
     let settled = false;
 
@@ -97,7 +103,7 @@ function runYtDlp(
 
 /** 動画のメタデータのみ取得（JSON）。stdout は巨大なのでログには流さない。 */
 export async function fetchMetadata(url: string, onLog: LogFn): Promise<YtMeta> {
-  onLog(`$ yt-dlp -J --no-playlist ${url}\n`);
+  onLog(`$ yt-dlp --js-runtimes node -J --no-playlist ${url}\n`);
   const stdout = await runYtDlp(["-J", "--no-playlist", url], {
     onLog,
     logStdout: false,
@@ -119,7 +125,9 @@ export async function downloadAudio(
   outPathNoExt: string,
   onLog: LogFn,
 ): Promise<void> {
-  onLog(`\n$ yt-dlp -x --audio-format mp3 -o <id>.%(ext)s ${url}\n`);
+  onLog(
+    `\n$ yt-dlp --js-runtimes node -x --audio-format mp3 -o <id>.%(ext)s ${url}\n`,
+  );
   await runYtDlp(
     [
       "-x",

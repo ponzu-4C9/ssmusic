@@ -25,7 +25,7 @@ RUN apk add --no-cache ffmpeg python3 py3-pip ca-certificates
 # yt-dlp を取り直せる（例: --build-arg YTDLP_REFRESH=$(date +%s)）
 ARG YTDLP_REFRESH=1
 RUN python3 -m venv /opt/yt-dlp \
-  && /opt/yt-dlp/bin/pip install --no-cache-dir -U yt-dlp
+  && /opt/yt-dlp/bin/pip install --no-cache-dir -U "yt-dlp[default]"
 ENV PATH="/opt/yt-dlp/bin:${PATH}"
 
 # ---- Dependencies ----
